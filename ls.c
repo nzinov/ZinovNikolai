@@ -5,7 +5,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <dirent.h>
-#include <limits.h>
+#include <linux/limits.h>
 #include <time.h>
 #include <pwd.h>
 #include <grp.h>
@@ -14,13 +14,13 @@ const char* MOD = "rwx";
 
 size_t ls(const char* dir_name) {
     DIR* d;
-    size_t size = 0;
     printf("%s:\n", dir_name);
     d = opendir(dir_name);
     if (!d) {
         fprintf(stderr, "Cannot open directory '%s'", dir_name);
         return 0;
     }
+    long begining = telldir(d);
     while (1) {
         struct dirent* entry;
         const char* entry_name;
@@ -36,28 +36,43 @@ size_t ls(const char* dir_name) {
         snprintf(path, PATH_MAX, "%s/%s", dir_name, entry_name);
         struct stat sb;
         stat(path, &sb);
-        switch (sb.st_mode & S_IFMT) {
-            case S_IFDIR:  printf("d");
-                           break;
-            case S_IFLNK:  printf("l");
-                           break;
-            case S_IFREG:  printf("-");
-                           break;
-            default:       printf("?"); 
-                           break;
+        if (S_ISDIR(sb.st_mode)) {
+            printf("d");
+        } else if (S_ISLNK(sb.st_mode)) {
+            printf("l");
+        } else if (S_ISREG(sb.st_mode)) {
+            printf("-");
+        } else {
+            printf("?");
         }
         for (int i = 0; i < 9; ++i) {
             putchar(sb.st_mode & (1 << (8 - i)) ? MOD[i % 3] : '-');
         }
         printf(" %li %s %s %s\n", sb.st_size, (getpwuid(sb.st_uid))->pw_name, (getgrgid(sb.st_gid))->gr_name, entry_name);
-        size += sb.st_size;
-        if (entry->d_type & DT_DIR) {
-            size += ls(path);
+    }
+    printf("\n");
+    seekdir(d, begining);
+    while (1) {
+        struct dirent* entry;
+        const char* entry_name;
+        entry = readdir(d);
+        if (!entry) {
+            break;
+        }
+        entry_name = entry->d_name;
+        if (entry_name[0] == '.') {
+            continue;
+        }
+        char path[PATH_MAX];
+        snprintf(path, PATH_MAX, "%s/%s", dir_name, entry_name);
+        struct stat sb;
+        stat(path, &sb);
+        if (S_ISDIR(sb.st_mode)) {
+            ls(path);
         }
     }
     closedir(d);
-    printf("total %lu\n\n", size);
-    return size;
+    return 0;
 }
 
 int main(int argc, char* argv[]) {

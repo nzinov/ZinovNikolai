@@ -114,7 +114,7 @@ int main() {
     finish_word();
     if (last_quote) {
         fputs("Unmatched quote found!", stderr);
-        abort();
+        exit(1);
     }
     qsort(words, word_count, sizeof(char*), cmp);
     for (size_t i = 0; i < word_count; ++i) {
